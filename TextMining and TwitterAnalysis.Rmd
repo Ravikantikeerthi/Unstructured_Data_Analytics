@@ -1,0 +1,234 @@
+---
+title: "Quiz_1_2_KeerthiRBollam"
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+## Question 1: Tweets analysis for Donald Trump @ POTUS and creating the word cloud
+library(twitteR)
+library(dplyr)
+library(ggplot2)
+api_key = "9EWT4rx9Vkj69vLc9rqffuGE1"
+api_secret = "7wnvAKFSchn15IFXxDPNO7J6OCgk19k806VYpAgrzgdl79t0XO"
+token = "220030109-PhiD3scJV9ueTfZismN8XobiuSFJs3MXL6zZkcKh"
+token_secret = "iZvm4sQbw9T82Zd9V35lRroySyi4zKnoIthkfuj3l18js"
+
+
+setup_twitter_oauth(api_key, api_secret, token, token_secret)
+
+trump = userTimeline('POTUS', n=50)
+
+```
+
+```{r}
+## converting to data frame ##
+df.trump = twListToDF(trump)
+
+```
+```{r}
+## String operations
+library(stringr)
+library(stringi)
+words_list = str_split(df.trump$text, ' ')
+## Each tweet is consdiering as a list
+words_list[1]
+words_list[[1]][1]
+
+```
+
+```{r}
+
+## Collate all the lists at one place
+words_list = str_split(df.trump$text, ' ')
+allwords=unlist(words_list)
+length(allwords)
+
+```
+
+```{r}
+df.allwords = as.data.frame(table(allwords))
+head(df.allwords)
+df.allwords = df.allwords %>% arrange(-Freq)
+
+```
+
+```{r}
+library(tm)
+common_stopwords = stopwords()
+custom_stopwords = c('&amp;')
+all_stopwords = c(common_stopwords, custom_stopwords)
+df.allwords = df.allwords[! df.allwords$allwords %in% all_stopwords,]
+
+```
+```{r}
+print(df.allwords)
+```
+
+```{r}
+#### creating the WordCloud ####
+
+library(wordcloud)
+wordcloud(df.allwords$allwords, df.allwords$Freq, min.freq = 1)
+
+
+## END ##
+
+```
+
+
+
+```{r}
+# Question Number 2 : Use date column to check day wise no of tweets. Plot line chart
+
+Tweets <- read.csv("C:/Users/Kikku/Google Drive/1 Data Science/11 unstructured data analytics/Lab/potus_tweets.csv")
+head(Tweets)
+
+```
+
+```{r}
+#convert the timestamp column in to date time object
+Tweets$timestamp = as.Date(Tweets$created)
+head(Tweets$timestamp)
+
+```
+
+```{r}
+## Extract date as per the requirement
+Tweets$day = format(Tweets$timestamp, "%d")
+Tweets$day
+
+```
+
+```{r}
+## Day wise number of Tweets
+tweets_day = Tweets %>% group_by(day) %>% summarise(count=n())
+tweets_day
+
+```
+
+```{r}
+## Plotting a bar plot as per the requirement
+
+bar_day <- ggplot(tweets_day, aes(x=day, y=count)) + geom_bar(stat = "identity", aes(fill = day))
+bar_day
+
+
+## END of Q2 ##
+
+```
+
+
+```{r}
+################# Question 3 : Read the book (India after Gandhi) ###################
+
+library(pdftools)
+
+setwd('C:/Users/Kikku/Google Drive/1 Data Science/11 unstructured data analytics/Lab/Quizes')
+book_text = pdf_text("india-after-gandhi.pdf")
+
+```
+
+```{r}
+#Removing all the special characters
+book_text_transformed = gsub("[^A-Za-z///' ]", "", book_text)
+
+################# Question 3a: Printing total number of documents #################
+docs = Corpus(VectorSource(book_text_transformed))
+
+print(docs)
+
+```
+
+```{r}
+################ Question 3c : Compute TDM and DTM #####################
+
+#cleaning corpus before calculating TDM and DTM
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeWords, stopwords())
+
+#compute TDM
+tdm <- TermDocumentMatrix(docs)
+words <- as.matrix(tdm)
+
+```
+
+```{r}
+# compute DTM
+dtm = DocumentTermMatrix(docs)
+dtm = as.matrix(dtm)
+
+```
+
+```{r}
+##############Question 3b : Calculate tot number of words identified by TDM #######################
+
+words_freq <- as.data.frame(rowSums(words))
+nrow(words_freq)
+
+```
+
+```{r}
+############# Question 3d: Identify bottom 15 words that has appeared ################
+
+words_freq <- as.data.frame(rowSums(words))
+names(words_freq) <- 'count'
+words_freq$words <- rownames(words_freq)
+words_freq <- words_freq %>% arrange(count)
+
+bottom15 = words_freq[1:15, "words"]
+head(bottom15, 15)
+
+```
+
+```{r}
+############# Question 3e: Identify bottom 15 words that has appeared ################
+words_freq_1 <- words_freq %>% arrange(-count)
+
+top10 = words_freq_1[1:10, "words"]
+head(top10, 10)
+
+```
+
+```{r}
+# END of Q3#
+```
+
+
+```{r}
+########### Question 4: Important parties and characters & association between them############
+
+
+# Converting the matrix to a data frame
+
+df_dtm = as.data.frame(dtm)
+
+```
+
+```{r}
+# subsetting the document term matrix with important characters and parties.
+df_dtm_imp = subset(df_dtm, select=c("bharatiya","indian","national","congress","lok","dal","janata","party",
+                                     "communist","telugu","desam","dravida","munnetra","kazhagam","muslim","league",
+                                     "rajiv","gandhi","indira","nehru","zail","mahatma"))
+head(df_dtm_imp)
+
+```
+
+
+```{r}
+#creating a correlation matrix
+df_dtm_imp_cor = cor(df_dtm_imp)
+
+```
+
+```{r}
+head(df_dtm_imp_cor)
+```
+
+```{r}
+## Use corrplot to visualize the associations
+library(corrplot)
+corrplot(df_dtm_imp_cor, type = "upper")
+
+```
+
