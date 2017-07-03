@@ -1,0 +1,159 @@
+---
+title: "UDA-Assignment2-Keerthi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r Assignment2-Question1, echo=TRUE, message=FALSE, warning=FALSE}
+################### Unstructured Data Analysis - Assignment 2 #################
+
+#-------------------------------------------------------------------------------------------------
+# 1. Using the tweets for narendra modi, draw a scatter plot using all the tweets (filter the data 
+# only for the month of November 2016)
+# a. X axis will be number of favorites
+# b. Y axis will be retweets
+# c. Size of the bubble will be the number of letters in each tweet
+# d. Color of the bubble will be based on the device used
+#--------------------------------------------------------------------------------------------------
+
+rm(list=ls())
+
+df.modi <- read.csv("C:/Users/Kikku/Google Drive/1 Data Science/11 unstructured data analytics/Lab/narendramodi_tweets.csv")
+#str(df.modi)
+library(twitteR)
+library(stringr)
+library(stringi)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+library(corrplot)
+library(heatmaply) ## For drawing dendrogram along with correlation
+
+df.modi_nov = filter(df.modi, as.Date(df.modi$created_at) >= "2016-11-01" & as.Date(df.modi$created_at) < "2016-12-01")
+#str(df.modi_nov)
+df.modi_nov$no_chars = nchar(as.character(df.modi_nov$text), type = "chars")
+
+# Scatter plot
+
+ggplot(df.modi_nov, aes(x = favorite_count, y = retweets_count)) +
+  geom_point(aes(size = no_chars, colour = source, alpha=.5)) + 
+  ggtitle("Narendra Modi Tweets for the month of Nov") +
+  labs(x = "Favourite Tweets Count", y = "Retweets Connt") +
+  scale_size(range = c(1,10)) +
+  theme_bw()
+
+```
+
+```{r Assignment2 - Question2, echo=TRUE, message=FALSE, warning=FALSE}
+#--------------------------------------------------------------------------------------------
+# 2. Use text mining package to create a word cloud for modi's tweet. While applying mapping, 
+# use SnowballC package to apply stemming
+#--------------------------------------------------------------------------------------------
+
+# create a corpus
+modi_corpus = Corpus(VectorSource(df.modi$text))
+
+# Convert the text to lower case
+modi_corpus <- tm_map(modi_corpus, content_transformer(tolower))
+# Remove URL
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+modi_corpus <- tm_map(modi_corpus, content_transformer(removeURL))
+
+#remove anything other than English letters or space
+
+KeepEnglish <- function(x) gsub("[^a-zA-Z/' ]", "", x)
+modi_corpus <- tm_map(modi_corpus, content_transformer(KeepEnglish))
+
+# Remove Stop Words
+custom_words = c("&amp;","amp","will", "can", "also", "via", "may", "always","had","here",
+                 "this","the")
+all_stopwords = c(stopwords("english"), custom_words)
+modi_corpus <- tm_map(modi_corpus, removeWords, all_stopwords)
+#inspect(modi_corpus)
+
+
+# Apply stemming using SnowballC package
+wordStem(modi_corpus, language = "porter")
+
+
+```
+
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+# create document term matrix applying some transformations
+tdm = TermDocumentMatrix(modi_corpus,
+                         control = list(removePunctuation = TRUE, removeNumbers = TRUE, 
+                                        tolower = TRUE))
+
+tdm_matrix <- as.matrix(tdm)
+tdm_sort <- sort(rowSums(tdm_matrix),decreasing=TRUE)
+tdm_df <- data.frame(word = names(tdm_sort),freq=tdm_sort)
+#head(tdm_df, 100)
+
+
+set.seed(1234)
+wordcloud(words = tdm_df$word, freq = tdm_df$freq, 
+          min.freq = 3,
+          max.words=50,
+          random.order=FALSE, 
+          rot.per=0.3, 
+          scale=c(4,.5),
+          font = 2, family = "serif",
+          colors=brewer.pal(8, "Dark2"))
+title("\n Narendra Modi Tweets",
+      cex.main=1, col.main="gray50")
+
+```
+
+```{r Assignment2 - Question3, echo=TRUE, message=FALSE, warning=FALSE}
+# ---------------------------------------------------------------
+# 3. Check the association between the top 10 hashtags.
+# ---------------------------------------------------------------
+
+# Scaping top 10 hashtags
+df.modi$text2 = gsub( "[^a-zA-Z0-9#/' ]" , "" , df.modi$text)
+modi_hashtags = unlist(str_extract_all(df.modi$text2, "#\\w+"))
+modi_hashtags_freq = head(sort(table(modi_hashtags), decreasing = TRUE),10)
+modi_hashtags_freq_df = as.data.frame(modi_hashtags_freq)
+top10_hashtags = gsub("[^A-Za-z0-9///'/ ]", "",modi_hashtags_freq_df$modi_hashtags)
+top10_hashtags = stri_trans_tolower(top10_hashtags)
+#View(top10_hashtags)
+
+# Finding associations among top 10 hashtags
+df.modi$text = as.character(df.modi$text)
+## removed spacial characters except '_' and '#'
+df.modi$text_transformed <- gsub("[^A-Za-z0-9///'/_/# ]", "", df.modi$text)
+modi_corpus_1 = Corpus(VectorSource(df.modi$text_transformed))
+
+# function to keep only the terms in "pattern" and remove everything else
+custom_content_transformer <- 
+  content_transformer(
+    function(x, pattern) regmatches(x, gregexpr(pattern, x, perl=TRUE, ignore.case=TRUE)))
+
+keep = "#\\S+"
+hashtag_tweet_corpus <- tm_map(modi_corpus_1, custom_content_transformer, keep)
+
+
+hashtag.dtm <- DocumentTermMatrix(hashtag_tweet_corpus)
+hashtags.dtm.df <- data.frame(as.matrix(hashtag.dtm))
+#View(hashtags.dtm.df)
+
+
+hashtags.tdm.top10 <- hashtags.dtm.df[, top10_hashtags]
+#View(hashtags.tdm.top10)
+
+corel_hashtags <- cor(hashtags.tdm.top10)
+corrplot(corel_hashtags,method="circle" )
+
+
+```
+
